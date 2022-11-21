@@ -178,18 +178,18 @@ function Add-NicRuDnsRecord {
         "Authorization" = "Bearer $AccessToken"
     }
     $sb = New-Object System.Text.StringBuilder '<?xml version="1.0" encoding="UTF-8" ?><request><rr-list>'
+    $counter = 0
     foreach ($r in $Record) {
-        Write-Verbose "Try to add $($r.name) of type $($r.type)"
-        if ($r.type -eq 'CNAME' -and $r.alias ) {
-            $r.name = $r.alias
+        # Side effect: set name on CNAME or SRV, type.ToUpper()
+        if (-not (Test-DNSRecordParameter $r)) {
+            continue
         }
-        elseif ($r.type -eq 'SRV' -and $r.'service-proto' ) {
-            $r.name = $r.'service-proto'
-        }
+        Write-Verbose "Try to add record '$($r.name)' of type '$($r.type)'"
+        $counter++
         $txt = "<rr>
         <name>$($r.name)</name>
         <ttl>$($r.ttl)</ttl>
-        <type>$($r.type.ToUpper())</type>
+        <type>$($r.type)</type>
         {0}
         </rr>
         "
@@ -304,6 +304,9 @@ function Add-NicRuDnsRecord {
         [void]$sb.Append($txt)
     }
     [void]$sb.Append('</rr-list></request>')
+    if (-not $counter) {
+        Write-Error "No valid records can be added" -ErrorAction Stop
+    }
     $requestParams = @{
         Uri = "https://api.nic.ru/dns-master/services/$Service/zones/$(Get-Punycode $ZoneName)/records"
         Headers = $Headers

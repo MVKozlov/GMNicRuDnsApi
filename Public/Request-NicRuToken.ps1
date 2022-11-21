@@ -9,6 +9,8 @@
         Application client_id
     .PARAMETER Client_Secret
         Application client_secret in SecureString form
+    .PARAMETER Client_Credential
+        Application client_id+client_secret in PSCredential form
     .PARAMETER Scope
         Access scope (for examples see Notes)
         scope это список в формате <method>:<url путь> <method>:<url путь> <method>:<url путь>.
@@ -35,6 +37,8 @@
         Client username in xxx/NIC-D form
     .PARAMETER Password
         Client password (may be administrative or technical)
+    .PARAMETER Credential
+        Client username+password in PSCredential form (may be administrative or technical)
     .PARAMETER RefreshToken
         Refresh token (for refresh access token)
     .OUTPUTS
@@ -44,11 +48,20 @@
         $username = '12345/NIC-D'
         $password = 'Pa$sw0rd' | ConvertTo-SecureString -AsPlainText
         $t = Request-NicRuToken -Client_id cid23424234 -Client_Secret cis2342423 -Username $username -Password $password
-        Get-NicRuService -AccessToken $t.access_token
+        Get-NicRuDnsService -AccessToken $t.access_token
+    .EXAMPLE
+        # Ask for user/password
+        $cred = Get-Credential '12345/NIC-D'
+        # Ask for client_id/client_secret
+        $cli_cred = Get-Credetial 'cid23424234'
+        # Request access to zone test.ru
+        Request-NicRuToken -Client_Credential $cli_cred -Credential $cred -Scope '/dns-master/zones/org.ru(/.+)?'
+        # Get entry using last received access token stored internally after Request-NicRuToken
+        Get-NicRuDnsRecord -Service 'PRST-ORG-RU' -ZoneName 'org.ru' -RecordName 'test'
     .EXAMPLE
         $t = Request-NicRuToken -Client_id cid23424234 -Client_Secret cis2342423 -RefreshToken ($t.refresh_token | ConvertTo-SecureString -AsPlainText)
-        # The last received access token is stored in the module for future use
-        Get-NicRuService
+        # The last received access token is stored inside the module for future use, so Access token not required
+        Get-NicRuDnsService
     .LINK
         https://www.nic.ru/manager/oauth.cgi?step=oauth.app_list
     .LINK
@@ -85,34 +98,57 @@
 function Request-NicRuToken {
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)]
+    [Parameter(Mandatory, ParameterSetName='iu')]
+    [Parameter(Mandatory, ParameterSetName='ic')]
+    [Parameter(Mandatory, ParameterSetName='ir')]
     [string]$Client_Id,
-    [Parameter(Mandatory)]
+    [Parameter(Mandatory, ParameterSetName='iu')]
+    [Parameter(Mandatory, ParameterSetName='ic')]
+    [Parameter(Mandatory, ParameterSetName='ir')]
     [securestring]$Client_Secret,
+    [Parameter(Mandatory, ParameterSetName='cu')]
+    [Parameter(Mandatory, ParameterSetName='cc')]
+    [Parameter(Mandatory, ParameterSetName='cr')]
+    [pscredential]$Client_Credential,
     [string]$Scope = '.+',
-    [Parameter(Mandatory, ParameterSetName='n')]
+    [Parameter(Mandatory, ParameterSetName='iu')]
+    [Parameter(Mandatory, ParameterSetName='cu')]
     [string]$Username,
-    [Parameter(Mandatory, ParameterSetName='n')]
+    [Parameter(Mandatory, ParameterSetName='iu')]
+    [Parameter(Mandatory, ParameterSetName='cu')]
     [securestring]$Password,
-    [Parameter(Mandatory, ParameterSetName='r')]
+    [Parameter(Mandatory, ParameterSetName='ic')]
+    [Parameter(Mandatory, ParameterSetName='cc')]
+    [pscredential]$Credential,
+    [Parameter(Mandatory, ParameterSetName='ir')]
+    [Parameter(Mandatory, ParameterSetName='cr')]
     [securestring]$RefreshToken
 )
-    $credentials = New-Object System.Management.Automation.PSCredential $Client_Id, $Client_Secret
-    if ($PSCmdlet.ParameterSetName -eq 'r') {
-        $c = [System.Management.Automation.PSCredential]::new('t', $RefreshToken)
+    if ($PSCmdlet.ParameterSetName -in 'iu', 'ic', 'ir') {
+        $credentials = New-Object System.Management.Automation.PSCredential $Client_Id, $Client_Secret
+    }
+    else {
+        $credentials = $Client_Credential
+    }
+    if ($PSCmdlet.ParameterSetName -in 'ir', 'cr') {
+        $c = New-Object System.Management.Automation.PSCredential @('t', $RefreshToken)
         $body = @{
-            grant_type='refresh_token'
-            refresh_token=$c.GetNetworkCredential().Password
+            grant_type = 'refresh_token'
+            refresh_token = $c.GetNetworkCredential().Password
         }
     }
     else {
-        $c = [System.Management.Automation.PSCredential]::new('t', $Password)
+        if ($PSCmdlet.ParameterSetName -in 'ic', 'cc') {
+            $Password = $Credential.Password
+            $Username = $Credential.UserName
+        }
+        $c = New-Object System.Management.Automation.PSCredential @('t', $Password)
         $body = @{
             offline = 1
-            grant_type='password'
-            scope=$Scope
-            username=$Username
-            password=$c.GetNetworkCredential().Password
+            grant_type = 'password'
+            scope = $Scope
+            username = $Username
+            password = $c.GetNetworkCredential().Password
         }
     }
     $requestParams = @{

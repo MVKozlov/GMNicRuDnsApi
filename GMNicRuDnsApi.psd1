@@ -12,7 +12,7 @@
 RootModule = 'GMNicRuDnsApi'
 
 # Version number of this module.
-ModuleVersion = '0.0.0.1'
+ModuleVersion = '1.0.0.0'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -30,7 +30,7 @@ CompanyName = 'NA'
 Copyright = '(c) MVKozlov. All rights reserved.'
 
 # Description of the functionality provided by this module
-Description = 'nic.ru dns api'
+Description = 'nic.ru dns api module. Lets use eg. winacme to renew letsencrypt certificate'
 
 # Minimum version of the PowerShell engine required by this module
 PowerShellVersion = '4.0'
@@ -130,7 +130,7 @@ PrivateData = @{
     PSData = @{
 
         # Tags applied to this module. These help with module discovery in online galleries.
-        Tags = @('DNS','nic.ru', 'api')
+        Tags = @('DNS','nic.ru', 'api', 'letsencrypt')
 
         # A URL to the license for this module.
         LicenseUri = 'https://opensource.org/licenses/MIT'
