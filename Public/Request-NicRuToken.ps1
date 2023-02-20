@@ -156,8 +156,18 @@ param(
         Headers = $Headers
         ContentType = "application/json; charset=utf-8"
         Body = $body
-        Credential = $credentials
-        Authentication = 'Basic'
+        UseBasicParsing = $true
+    }
+    if ($PSVersionTable.PSVersion.Major -lt 7) {
+        # legacy powershell authorization workaround
+        $requestParams.Headers = @{
+            Authorization = 'Basic ' + [Convert]::ToBase64String([System.Text.Encoding]::Utf8.GetBytes($credentials.UserName + ':' + $credentials.GetNetworkCredential().Password))
+        }
+        $requestParams.Use
+    }
+    else {
+        $requestParams.Authentication = 'Basic'
+        $requestParams.Credential = $credentials
     }
     Write-Verbose $requestParams.Uri
     Invoke-RestMethod -Method Post @requestParams @GMNicRuProxySettings | Tee-Object -Variable token

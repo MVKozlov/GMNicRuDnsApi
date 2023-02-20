@@ -1,4 +1,4 @@
-# nic.ru DNS api module
+# Модуль nic.ru/DNS api
 
 Модуль PowerShell для работы с [DNS Api от nic.ru](https://www.nic.ru/help/api-dns-hostinga_3643.html)
 ( Помощь | Услуги | Сервисы | API ), [Документация](https://www.nic.ru/help/upload/file/API_DNS-hosting.pdf)
@@ -63,6 +63,9 @@ Get-NicRuDnsZone -Service prst-test-ru
 
 ## Пример использования сохраненных токенов в файлике и работы с этим всем автоматически
 
+Предполагается, что первоначально токены уже созданы вручную и записаны в файл с помощью описанной выше процедуры через
+`New-NicCredential` / `Save-NicCredential`
+
 Никаких проверок на ошибки
 
 ``` powershell
@@ -87,15 +90,16 @@ $t = Request-NicRuToken -Client_Id $credentials.client_id -Client_Secret $creden
 
 # Тут же сохраняем обратно, потому что при получении access_token, refresh_token тоже сразу меняется
 $credentials.refresh_token = $t.refresh_token | ConvertTo-SecureString -AsPlainText -Force
+# Тут стоило бы добавить проверку, что ошибки не было, а то затрём рабочий токен
 Save-NicCredential -Path d:\nic_credentials.txt -Credential $credentials
 
 # Используем уже автоматом, например, для создания записи под LetsEncrypt
 Add-NicRuDnsRecord -Service prst-svc-test-ru -ZoneName test.ru -Record @{name='_acme-challenge'; type='txt'; text='h694hd58934256hf8346s583645s'} | Tee-Object -Variable acme
-Complete-NicRuDnsZoneChange
+Complete-NicRuDnsZoneChange -Service prst-svc-test-ru -ZoneName test.ru
 
 # Естественно, для LE её потом надо будет удалить за собой
 Remove-NicRuDnsRecord -Service prst-svc-test-ru -ZoneName test.ru -Id $acme.Id
-Complete-NicRuDnsZoneChange
+Complete-NicRuDnsZoneChange -Service prst-svc-test-ru -ZoneName test.ru
 ```
 
 Пайплайн в общем-то не нужен и поддерживается для одного единственного коммандлета _Remove-NicRuDnsRecord_, для одного единственного параметра _Id_, остальное симулируется через splatting
