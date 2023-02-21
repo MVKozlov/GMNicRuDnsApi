@@ -66,7 +66,9 @@ Get-NicRuDnsZone -Service prst-test-ru
 Предполагается, что первоначально токены уже созданы вручную и записаны в файл с помощью описанной выше процедуры через
 `New-NicCredential` / `Save-NicCredential`
 
-Никаких проверок на ошибки
+Готовый скрипт для WinACME [ValidateDNS_NicRu](Scripts/ValidateDNS_NicRu.ps1)
+
+Ниже абстрактный пример. Никаких проверок на ошибки
 
 ``` powershell
 function Save-NicCredential($path, $credential) {
@@ -94,10 +96,15 @@ $credentials.refresh_token = $t.refresh_token | ConvertTo-SecureString -AsPlainT
 Save-NicCredential -Path d:\nic_credentials.txt -Credential $credentials
 
 # Используем уже автоматом, например, для создания записи под LetsEncrypt
-Add-NicRuDnsRecord -Service prst-svc-test-ru -ZoneName test.ru -Record @{name='_acme-challenge'; type='txt'; text='h694hd58934256hf8346s583645s'} | Tee-Object -Variable acme
+# Тут вместо Read-Host кто-то внешний нам должен дать значение для text.
+$text = Read-Host -Prompt "Введите значение для TXT записи _acme-challenge"
+Add-NicRuDnsRecord -Service prst-svc-test-ru -ZoneName test.ru -Record @{name='_acme-challenge'; type='txt'; text=$text} | Tee-Object -Variable acme
 Complete-NicRuDnsZoneChange -Service prst-svc-test-ru -ZoneName test.ru
 
-# Естественно, для LE её потом надо будет удалить за собой
+# Тут кто-то внешний получает/обновляет сертификат. а мы ждём
+Read-Host
+
+# Естественно, для LE запись потом надо будет удалить за собой
 Remove-NicRuDnsRecord -Service prst-svc-test-ru -ZoneName test.ru -Id $acme.Id
 Complete-NicRuDnsZoneChange -Service prst-svc-test-ru -ZoneName test.ru
 ```
