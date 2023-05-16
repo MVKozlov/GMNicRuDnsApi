@@ -21,6 +21,8 @@
         Если есть желание передавать эти значения через параметры вызова, надо, соответственно,
         иcпользовать правильные --dnscreatescriptarguments
 
+        Полностью рабочий пример такого использования в wacs_le_launch.cmd (но всё равно зависит от подготовленных credentials!)
+
         Так как WinACME проверяет DNS сразу после вызова, а nic.ru раскидывает зоны не спеша, необходимо "поспать" перед выходом
         Это время можно уменьшить/увеличить, поправив
         $SLEEP_AFTER_UPDATE = 180 
@@ -47,8 +49,8 @@ function Save-NicCredential($path, $access_object) {
     Set-Content -Path $path -Value $access_object.client_id,
         ($access_object.client_secret | ConvertFrom-SecureString),
         ($access_object.refresh_token | ConvertFrom-SecureString),
-        ($access_object.access_token  | ConvertFrom-SecureString),
-         $access_object.access_expires.ToFileTime() -ErrorAction Stop
+        ($access_object.access_token  | ConvertFrom-SecureString  -ErrorAction SilentlyContinue),
+        ($access_object.access_expires.ToFileTime()) -ErrorAction Stop
 }
 function Restore-NicCredential($path) {
     Write-Verbose "Restore credentials from $path"
@@ -58,7 +60,7 @@ function Restore-NicCredential($path) {
         client_secret = $data[1] | ConvertTo-SecureString
         refresh_token = $data[2] | ConvertTo-SecureString
         access_token  = if ($data[3]) { $data[3] | ConvertTo-SecureString } else { '' }
-        access_expires = if ($data[4]) { [DateTime]::FromFileTime(([int64]$data[4])) } else { [DateTime]::MinValue }
+        access_expires = if ($data[4]) { [DateTime]::FromFileTime(([int64]$data[4])) } else { [DateTime]'2020-01-01' }
     }
 }
 
@@ -69,7 +71,7 @@ if (-not ($credentials.client_id -and $credentials.client_secret -and $credentia
     throw "Can't find valid credentials"
 }
 # Обновляем если надо
-if ((-not $credentials.access_token) -or ($credentials.access_expires -le $TimeNow.AddSeconds(300))) {
+if ((-not $credentials.access_token) -or ($credentials.access_expires -le $TimeNow.AddSeconds($SLEEP_AFTER_UPDATE*2+120))) {
     Write-Verbose "Request token"
     # Получаем свежий токен
     $t = Request-NicRuToken -Client_Id $credentials.client_id -Client_Secret $credentials.client_secret -RefreshToken $credentials.refresh_token
@@ -80,7 +82,7 @@ if ((-not $credentials.access_token) -or ($credentials.access_expires -le $TimeN
     $credentials.refresh_token = $t.refresh_token | ConvertTo-SecureString -AsPlainText -Force
     $credentials.access_token = $t.access_token | ConvertTo-SecureString -AsPlainText -Force
     $credentials.access_expires = (Get-Date).AddSeconds($t.expires_in)
-    Save-NicCredential -Path $CredentialPath -Credential $credentials
+    Save-NicCredential -Path $CredentialPath -access_object $credentials
 }
 else {
     Write-Verbose "Register saved token"
